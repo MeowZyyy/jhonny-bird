@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Johnny Bird</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #game-container {
+            position: relative;
+            width: 800px;
+            height: 600px;
+            background-color: #000;
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 10;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        h1 {
+            color: #ffeb3b;
+            text-shadow: 4px 4px 0 #f44336;
+            margin-bottom: 40px;
+            font-size: 36px;
+            line-height: 1.5;
+        }
+
+        .btn {
+            background-color: #4CAF50;
+            color: white;
+            border: 4px solid #fff;
+            padding: 15px 30px;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            transition: transform 0.1s, background-color 0.2s;
+        }
+
+        .btn:hover {
+            background-color: #45a049;
+            transform: scale(1.05);
+        }
+
+        .btn:active {
+            transform: scale(0.95);
+        }
+
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        #score-display {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 24px;
+            color: white;
+            z-index: 5;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        .instruction {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="gameCanvas" width="800" height="600"></canvas>
+    <div id="score-display" class="hidden">Score: 0</div>
+
+    <!-- Main Menu -->
+    <div id="main-menu" class="ui-layer">
+        <h1>JOHNNY BIRD</h1>
+        <div class="menu-options">
+            <button class="btn" onclick="showCharacterMenu()">START GAME</button>
+        </div>
+        <p class="instruction">Press Space to Flap</p>
+    </div>
+
+    <!-- Character Menu -->
+    <div id="character-menu" class="ui-layer hidden">
+        <h2 style="color: #e91e63; margin-bottom: 30px;">SELECT BIRD</h2>
+        <div class="menu-options">
+            <button class="btn" onclick="selectCharacter('O>')">1. JOHNNY (O>)</button>
+            <button class="btn" onclick="selectCharacter('@_@')">2. MAIMUNAH (@_@)</button>
+            <button class="btn" onclick="selectCharacter('^_^')">3. TINGO (^_^)</button>
+        </div>
+    </div>
+
+    <!-- Background Menu -->
+    <div id="background-menu" class="ui-layer hidden">
+        <h2 style="color: #00bcd4; margin-bottom: 30px;">SELECT THEME</h2>
+        <div class="menu-options">
+            <button class="btn" onclick="selectTheme(1)">1. WINTER</button>
+            <button class="btn" onclick="selectTheme(2)">2. DESERT</button>
+            <button class="btn" onclick="selectTheme(3)">3. CLOUDY</button>
+        </div>
+    </div>
+
+    <!-- Game Over Menu -->
+    <div id="game-over-menu" class="ui-layer hidden">
+        <h1 style="color: #f44336; text-shadow: 4px 4px 0 #000;">GAME OVER</h1>
+        <p style="font-size: 24px; margin-bottom: 30px;">FINAL SCORE: <span id="final-score">0</span></p>
+        <button class="btn" onclick="resetToMainMenu()">MAIN MENU</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    // Audio Context and Synth Sound Effects
+    let audioCtx = null;
+
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    // Initialize audio on any window click to bypass browser restrictions
+    window.addEventListener('click', initAudio);
+    window.addEventListener('keydown', initAudio);
+
+    function playFlapSound() {
+        initAudio();
+        if (!audioCtx) return;
+        
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(380, audioCtx.currentTime + 0.15);
+        
+        gainNode.gain.setValueAtTime(0.35, audioCtx.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+    }
+
+    function playScoreSound() {
+        initAudio();
+        if (!audioCtx) return;
+        
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.type = 'sine';
+        const now = audioCtx.currentTime;
+        
+        osc.frequency.setValueAtTime(880, now); // A5
+        osc.frequency.setValueAtTime(1318.51, now + 0.08); // E6
+        
+        gainNode.gain.setValueAtTime(0.1, now);
+        gainNode.gain.setValueAtTime(0.1, now + 0.08);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+        
+        osc.start(now);
+        osc.stop(now + 0.25);
+    }
+
+    function playCrashSound() {
+        initAudio();
+        if (!audioCtx) return;
+        
+        const osc = audioCtx.createOscillator();
+        const gainNode = audioCtx.createGain();
+        
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        
+        osc.type = 'sawtooth';
+        const now = audioCtx.currentTime;
+        
+        osc.frequency.setValueAtTime(300, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.4);
+        
+        gainNode.gain.setValueAtTime(0.15, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+        
+        osc.start(now);
+        osc.stop(now + 0.4);
+    }
+
+    // UI Elements
+    const mainMenu = document.getElementById('main-menu');
+    const charMenu = document.getElementById('character-menu');
+    const bgMenu = document.getElementById('background-menu');
+    const gameOverMenu = document.getElementById('game-over-menu');
+    const scoreDisplay = document.getElementById('score-display');
+    const finalScoreEl = document.getElementById('final-score');
+
+    // Game Variables
+    let gameState = 'MENU'; // MENU, PLAYING, GAMEOVER
+    let birdChar = 'O>';
+    let themeChoice = 1;
+    let score = 0;
+    
+    // Physics & Rendering Constants
+    const CELL_SIZE = 25;
+    const WIDTH_CELLS = Math.floor(canvas.width / CELL_SIZE);
+    const HEIGHT_CELLS = Math.floor(canvas.height / CELL_SIZE);
+    
+    const BIRD_X = 5;
+    let birdY = HEIGHT_CELLS / 2;
+    let velocity = 0;
+    const gravity = 0.02; // Reduced gravity so you don't fall instantly
+    const flapStrength = -0.4; // Softer flap to balance the lower gravity
+    
+    let pipes = [];
+    let frameCount = 0;
+    const PIPE_FREQ = 100; // Increased pipe frequency gap to give more time
+    const PIPE_GAP = 8; // Slightly larger gap to make it easier
+    
+    // Background Elements
+    let bgParticles = [];
+
+    // Theme Colors
+    const themes = {
+        1: { bg: '#0D47A1', fg: '#FFFFFF' }, // Winter
+        2: { bg: '#5D4037', fg: '#FFEB3B' }, // Desert
+        3: { bg: '#00838F', fg: '#FFFFFF' }  // Cloudy
+    };
+
+    function initParticles() {
+        bgParticles = [];
+        for(let i=0; i<15; i++) {
+            bgParticles.push({
+                x: Math.random() * WIDTH_CELLS,
+                y: Math.random() * HEIGHT_CELLS
+            });
+        }
+    }
+
+    function showCharacterMenu() {
+        initAudio();
+        mainMenu.classList.add('hidden');
+        charMenu.classList.remove('hidden');
+    }
+
+    function selectCharacter(char) {
+        initAudio();
+        birdChar = char;
+        charMenu.classList.add('hidden');
+        bgMenu.classList.remove('hidden');
+    }
+
+    function selectTheme(theme) {
+        initAudio();
+        themeChoice = theme;
+        bgMenu.classList.add('hidden');
+        startGame();
+    }
+
+    function resetToMainMenu() {
+        gameOverMenu.classList.add('hidden');
+        mainMenu.classList.remove('hidden');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function startGame() {
+        initAudio();
+        initParticles();
+        birdY = HEIGHT_CELLS / 2;
+        velocity = 0;
+        pipes = [];
+        frameCount = 0;
+        score = 0;
+        gameState = 'PLAYING';
+        scoreDisplay.classList.remove('hidden');
+        updateScore();
+        gameLoop();
+    }
+
+    function updateScore() {
+        scoreDisplay.innerText = `Score: ${score}`;
+    }
+
+    function gameOver() {
+        gameState = 'GAMEOVER';
+        scoreDisplay.classList.add('hidden');
+        finalScoreEl.innerText = score;
+        gameOverMenu.classList.remove('hidden');
+        playCrashSound();
+    }
+
+    // Input Handling
+    window.addEventListener('keydown', (e) => {
+        if (e.code === 'Space' && gameState === 'PLAYING') {
+            velocity = flapStrength;
+            playFlapSound();
+            e.preventDefault();
+        }
+    });
+
+    // Touch support for mobile/tablets
+    window.addEventListener('touchstart', (e) => {
+         if (gameState === 'PLAYING') {
+            velocity = flapStrength;
+            playFlapSound();
+            e.preventDefault();
+        }
+    }, {passive: false});
+
+    function drawChar(char, x, y, color) {
+        ctx.fillStyle = color;
+        ctx.font = '20px "Press Start 2P"';
+        ctx.fillText(char, x * CELL_SIZE, (y + 1) * CELL_SIZE - 5);
+    }
+
+    function update() {
+        if (gameState !== 'PLAYING') return;
+
+        // Physics
+        velocity += gravity;
+        birdY += velocity;
+
+        if (birdY < 0) {
+            birdY = 0;
+            velocity = 0;
+        }
+
+        // Pipe Generation
+        if (frameCount % PIPE_FREQ === 0) {
+            let gapY = 2 + Math.floor(Math.random() * (HEIGHT_CELLS - PIPE_GAP - 4));
+            pipes.push({ x: WIDTH_CELLS, gapY: gapY, passed: false });
+        }
+
+        // Pipe Movement & Collision
+        for (let i = 0; i < pipes.length; i++) {
+            let p = pipes[i];
+            p.x -= 0.10; // Speed of pipes (reduced for easier gameplay)
+
+            // Collision
+            let birdRect = {
+                left: BIRD_X,
+                right: BIRD_X + (birdChar.length * 0.8), // approximate width
+                top: birdY,
+                bottom: birdY + 1
+            };
+
+            let pipeRect = { left: p.x, right: p.x + 2 };
+
+            // Check if bird is within pipe's X range
+            if (birdRect.right > pipeRect.left && birdRect.left < pipeRect.right) {
+                // Check Y range (outside the gap)
+                if (birdRect.top < p.gapY || birdRect.bottom > p.gapY + PIPE_GAP) {
+                    gameOver();
+                    return;
+                }
+            }
+
+            // Score
+            if (!p.passed && p.x + 2 < BIRD_X) {
+                p.passed = true;
+                score++;
+                updateScore();
+                playScoreSound();
+            }
+        }
+
+        // Remove old pipes
+        if (pipes.length > 0 && pipes[0].x < -2) {
+            pipes.shift();
+        }
+
+        // Floor collision
+        if (birdY >= HEIGHT_CELLS - 1) {
+            gameOver();
+            return;
+        }
+
+        // Move background particles slowly
+        for(let p of bgParticles) {
+            p.x -= 0.05;
+            if(p.x < 0) p.x = WIDTH_CELLS;
+        }
+
+        frameCount++;
+    }
+
+    function draw() {
+        if (gameState !== 'PLAYING') return;
+
+        // Background
+        ctx.fillStyle = themes[themeChoice].bg;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Draw background particles
+        let particleChar = themeChoice === 1 ? '*' : (themeChoice === 2 ? '#' : '~');
+        for(let p of bgParticles) {
+            drawChar(particleChar, p.x, p.y, themes[themeChoice].fg);
+        }
+
+        // Draw Pipes
+        ctx.fillStyle = '#4CAF50'; // Green pipes
+        for (let p of pipes) {
+            for (let y = 0; y < HEIGHT_CELLS; y++) {
+                if (y < p.gapY || y >= p.gapY + PIPE_GAP) {
+                    drawChar('|', p.x, y, '#4CAF50');
+                    drawChar('|', p.x + 1, y, '#4CAF50');
+                }
+            }
+        }
+
+        // Draw Bird
+        drawChar(birdChar, BIRD_X, birdY, '#F44336'); // Red bird
+
+        // Draw Flapping Wing
+        let wingChar = velocity < 0 ? '^' : 'v';
+        let wingXOffset = birdChar === 'O>' ? 0.3 : 0.8;
+        drawChar(wingChar, BIRD_X + wingXOffset, birdY - 0.35, '#FFEB3B'); // Yellow flapping wing
+
+    }
+
+    function gameLoop() {
+        if (gameState === 'PLAYING') {
+            update();
+            draw();
+            setTimeout(gameLoop, 1000 / 60); // Lock to 60 FPS to prevent high refresh rate monitors from speeding up the game
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,290 @@
+#include <iostream>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <conio.h>
+#include <windows.h> // for SetConsoleTextAttribute
+
+using namespace std;
+
+const int WIDTH = 30;
+const int HEIGHT = 20;
+const int PIPE_GAP = 6;
+const int PIPE_FREQ = 30;
+
+struct Pipe {
+    int x;
+    int gapY;
+};
+
+string birdChar = "O>";
+int themeChoice = 1;
+
+// Set console text color
+void SetColor(int textColor, int backgroundColor) {
+    SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), (backgroundColor << 4) | textColor);
+}
+
+// Position console cursor without clearing screen
+void moveCursorToTopLeft() {
+    COORD coord = {0, 0};
+    SetConsoleCursorPosition(GetStdHandle(STD_OUTPUT_HANDLE), coord);
+}
+
+// Draw background symbols with colors
+void drawBackgroundSymbols(int y, int x, int theme) {
+    switch (theme) {
+    case 1: // Winter
+        SetColor(15, 1); // White text, Blue background
+        if ((y == 2 && x == 10) || (y == 4 && x == 20) || (y == 6 && x == 5) || (y == 10 && x == 2) || (y == 12 && x == 16))
+            cout << "*";
+        else
+            cout << " ";
+        break;
+    case 2: // Desert
+        SetColor(14, 6); // Yellow text, Brown background
+        if ((y == HEIGHT - 2 && x == 7) || (y == HEIGHT - 2 && x == 15) || (y == HEIGHT - 2 && x == 20) || (y == HEIGHT - 2 && x == 25))
+            cout << "#";
+        else if ((y == 2 && x == 10) || (y == 4 && x == 20) || (y == 6 && x == 5) || (y == 10 && x == 2))
+            cout << "~";
+        else
+            cout << " ";
+        break;
+    case 3: // Cloudy
+        SetColor(15, 3); // White text, Aqua background
+        if ((y == 1 && x == 12) || (y == 2 && x == 22) || (y == 2 && x == 10) || (y == 4 && x == 20) || (y == 6 && x == 5) || (y == 10 && x == 2))
+            cout << "~";
+        else
+            cout << " ";
+        break;
+    default:
+        SetColor(15, 0); // Default
+        cout << " ";
+    }
+}
+
+// Draw game elements
+void draw(int birdY, const vector<Pipe>& pipes, int score) {
+    moveCursorToTopLeft();
+
+    vector<string> buffer(HEIGHT, string(WIDTH, ' '));
+
+    // Fill buffer with background symbols
+    for (int y = 0; y < HEIGHT; ++y) {
+        for (int x = 0; x < WIDTH; ++x) {
+            switch (themeChoice) {
+                case 1:
+                    if ((y == 2 && x == 10) || (y == 4 && x == 20) || (y == 6 && x == 5) || (y == 10 && x == 2) || (y == 12 && x == 16))
+                        buffer[y][x] = '*';
+                    break;
+                case 2:
+                    if ((y == HEIGHT - 2 && x == 7) || (y == HEIGHT - 2 && x == 15) || (y == HEIGHT - 2 && x == 20) || (y == HEIGHT - 2 && x == 25))
+                        buffer[y][x] = '#';
+                    else if ((y == 2 && x == 10) || (y == 4 && x == 20) || (y == 6 && x == 5) || (y == 10 && x == 2))
+                        buffer[y][x] = '~';
+                    break;
+                case 3:
+                    if ((y == 1 && x == 12) || (y == 2 && x == 22) || (y == 2 && x == 10) || (y == 4 && x == 20) || (y == 6 && x == 5) || (y == 10 && x == 2))
+                        buffer[y][x] = '~';
+                    break;
+            }
+        }
+    }
+
+    // Place bird in buffer
+    for (int i = 0; i < birdChar.length(); ++i) {
+        if (5 + i < WIDTH && birdY >= 0 && birdY < HEIGHT)
+            buffer[birdY][5 + i] = birdChar[i];
+    }
+
+    // Place pipes in buffer
+    for (const auto& pipe : pipes) {
+        if (pipe.x >= 0 && pipe.x < WIDTH - 1) {
+            for (int y = 0; y < HEIGHT; ++y) {
+                if (y < pipe.gapY || y >= pipe.gapY + PIPE_GAP) {
+                    buffer[y][pipe.x] = '|';
+                    if (pipe.x + 1 < WIDTH)
+                        buffer[y][pipe.x + 1] = '|';
+                }
+            }
+        }
+    }
+
+    // Render buffer to screen with colors
+    for (int y = 0; y < HEIGHT; ++y) {
+        for (int x = 0; x < WIDTH; ++x) {
+            char ch = buffer[y][x];
+            switch (ch) {
+                case '*': SetColor(15, 1); break; // Winter snow
+                case '#': SetColor(6, 0); break;  // Cactus
+                case '~': SetColor(8, 7); break;  // Cloud
+                case '|': SetColor(10, 0); break; // Pipes
+                case 'O': case '>': case '@': case '_':
+                case '^': case '-': SetColor(12, 0); break; // Bird
+                default:
+                    // Set theme background
+                    switch (themeChoice) {
+                        case 1: SetColor(1, 1); break; // Winter (blue)
+                        case 2: SetColor(6, 6); break; // Desert (brown)
+                        case 3: SetColor(3, 3); break; // Cloudy (aqua)
+                        default: SetColor(7, 0); break;
+                    }
+                    break;
+            }
+            cout << ch;
+        }
+        cout << "\n";
+    }
+
+    // Score and instructions
+    SetColor(14, 0);
+    cout << "Score: " << score << "\n";
+    SetColor(7, 0);
+    cout << "Press SPACE to flap. Press 'Q' to quit.\n";
+}
+
+// Menu
+void showMenu() {
+    system("cls");
+    SetColor(9, 0);
+    cout << "\n\n";
+    cout << string(40, ' ') << "========================================\n";
+    cout << string(40, ' ') << "           WELCOME TO JOHNNY BIRD\n";
+    cout << string(40, ' ') << "========================================\n\n";
+    SetColor(15, 0);
+    cout << string(40, ' ') << "1. Start Game\n";
+    cout << string(40, ' ') << "2. Quit\n\n";
+    cout << string(40, ' ') << "Select an option: ";
+}
+
+void characterMenu() {
+    system("cls");
+    SetColor(13, 0);
+    cout << "\n\n";
+    cout << string(40, ' ') << "========================================\n";
+    cout << string(40, ' ') << "           CHARACTER SELECTION\n";
+    cout << string(40, ' ') << "========================================\n\n";
+    SetColor(15, 0);
+    cout << string(40, ' ') << "Choose your bird:\n";
+    cout << string(40, ' ') << "1. O>      (JOHNNY)\n";
+    cout << string(40, ' ') << "2. @_@     (MAIMUNAH)\n";
+    cout << string(40, ' ') << "3. ^_^     (TINGO)\n\n";
+    cout << string(40, ' ') << "Selection: ";
+
+    int c;
+    cin >> c;
+    if (c == 1) birdChar = "O>";
+    else if (c == 2) birdChar = "@_@";
+    else if (c == 3) birdChar = "^_^";
+    else birdChar = "O>";
+}
+
+void backgroundMenu() {
+    system("cls");
+    SetColor(11, 0);
+    cout << "\n\n";
+    cout << string(40, ' ') << "========================================\n";
+    cout << string(40, ' ') << "           BACKGROUND SELECTION\n";
+    cout << string(40, ' ') << "========================================\n\n";
+    SetColor(15, 0);
+    cout << string(40, ' ') << "Choose a theme:\n";
+    cout << string(40, ' ') << "1. Winter     (* snowflakes)\n";
+    cout << string(40, ' ') << "2. Desert     (# cactus)\n";
+    cout << string(40, ' ') << "3. Cloudy     (~ clouds)\n\n";
+    cout << string(40, ' ') << "Selection: ";
+
+    cin >> themeChoice;
+    if (themeChoice < 1 || themeChoice > 3) themeChoice = 1;
+}
+
+// Main game loop
+bool runGame() {
+    int birdY = HEIGHT / 2;
+    float velocity = 0;
+    float gravity = 0.5f;
+    int frameCount = 0;
+    int score = 0;
+
+    vector<Pipe> pipes;
+    srand(static_cast<unsigned>(time(0)));
+
+    while (true) {
+        if (_kbhit()) {
+            char ch = _getch();
+            if (ch == ' ') velocity = -2.5f;
+            else if (ch == 'q' || ch == 'Q') return false;
+        }
+
+        velocity += gravity;
+        birdY += static_cast<int>(velocity);
+        if (birdY < 0) birdY = 0;
+
+        // Add new pipe
+        if (frameCount % PIPE_FREQ == 0) {
+            Pipe newPipe;
+            newPipe.x = WIDTH - 1;
+            newPipe.gapY = 2 + rand() % (HEIGHT - PIPE_GAP - 4);
+            pipes.push_back(newPipe);
+        }
+
+        // Move pipes
+        for (auto& pipe : pipes) pipe.x--;
+        if (!pipes.empty() && pipes[0].x < 0) pipes.erase(pipes.begin());
+
+        // Collision detection
+        for (auto& pipe : pipes) {
+            if (pipe.x == 5) {
+                if (birdY < pipe.gapY || birdY >= pipe.gapY + PIPE_GAP) {
+                    draw(birdY, pipes, score);
+                    SetColor(4, 0);
+                    cout << "💥 Game Over! Final Score: " << score << "\n";
+                    cout << "Press any key to return to menu...\n";
+                    _getch();
+                    return true;
+                }
+                else {
+                    score++;
+                }
+            }
+        }
+
+        if (birdY >= HEIGHT) {
+            draw(birdY, pipes, score);
+            SetColor(4, 0);
+            cout << "💥 You hit the ground! Final Score: " << score << "\n";
+            cout << "Press any key to return to menu...\n";
+            _getch();
+            return true;
+        }
+
+        draw(birdY, pipes, score);
+        Sleep(50);  // Control the game speed here
+        frameCount++;
+    }
+}
+
+int main() {
+    while (true) {
+        showMenu();
+        int choice;
+        cin >> choice;
+
+        if (choice == 1) {
+            characterMenu();
+            backgroundMenu();
+            system("cls");  // Clear the screen before starting the game
+            bool playAgain = runGame();
+            if (!playAgain) break;
+        }
+        else if (choice == 2) {
+            cout << "Thanks for playing!\n";
+            break;
+        }
+        else {
+            cout << "Invalid option. Try again.\n";
+            Sleep(1000);
+        }
+    }
+
+    return 0;
+}
