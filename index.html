@@ -474,6 +474,27 @@
             setTimeout(gameLoop, 1000 / 60); // Lock to 60 FPS to prevent high refresh rate monitors from speeding up the game
         }
     }
+
+    // Screenshot Preview Mode Hook for generating documentation images
+    window.addEventListener('DOMContentLoaded', () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('preview') === 'true') {
+            gameState = 'PLAYING';
+            score = 12;
+            updateScore();
+            scoreDisplay.classList.remove('hidden');
+            mainMenu.classList.add('hidden');
+            birdY = 10;
+            velocity = -0.1; // Make wing point up for the shot
+            pipes = [
+                { x: 12, gapY: 6, passed: false },
+                { x: 22, gapY: 9, passed: false },
+                { x: 32, gapY: 4, passed: false }
+            ];
+            initParticles();
+            draw();
+        }
+    });
 </script>
 </body>
 </html>
